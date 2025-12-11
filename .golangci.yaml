@@ -1,0 +1,24 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  default: all
+  disable:
+    # This package uses generics to return interface types by design
+    - ireturn
+    # The Key interface has 11 methods which is acceptable for this API
+    - interfacebloat
+    # Disable depguard since this is a simple package without external dependencies
+    - depguard
+  settings:
+    cyclop:
+      max-complexity: 30
+    funlen:
+      lines: 200
+      statements: 100
+    gocognit:
+      min-complexity: 60
