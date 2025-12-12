@@ -491,122 +491,52 @@ func TestString(t *testing.T) {
 	})
 }
 
-// TestDebugValue tests the DebugValue method.
-func TestDebugValue(t *testing.T) {
+// TestGoString tests the GoString method for keys.
+func TestGoString(t *testing.T) {
 	t.Parallel()
 
-	t.Run("unset key shows not set", func(t *testing.T) {
+	t.Run("Key GoString includes package name and type", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
 		key := feature.NewNamed[string]("test-key")
+		goStr := key.GoString()
 
-		debugValue := key.DebugValue(ctx)
+		if !strings.Contains(goStr, "feature.Key[string]") {
+			t.Errorf("GoString() = %q, want to contain %q", goStr, "feature.Key[string]")
+		}
 
-		want := "test-key: <not set>"
+		if !strings.Contains(goStr, "name:") {
+			t.Errorf("GoString() = %q, want to contain field name %q", goStr, "name:")
+		}
 
-		if debugValue != want {
-			t.Errorf("DebugValue() = %q, want %q", debugValue, want)
+		if !strings.Contains(goStr, "test-key") {
+			t.Errorf("GoString() = %q, want to contain %q", goStr, "test-key")
 		}
 	})
 
-	t.Run("set key shows name and value", func(t *testing.T) {
+	t.Run("Key GoString with int type", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
 		key := feature.NewNamed[int]("max-retries")
-		ctx = key.WithValue(ctx, 5)
-		debugValue := key.DebugValue(ctx)
-		want := "max-retries: 5"
+		goStr := key.GoString()
 
-		if debugValue != want {
-			t.Errorf("DebugValue() = %q, want %q", debugValue, want)
+		if !strings.Contains(goStr, "feature.Key[int]") {
+			t.Errorf("GoString() = %q, want to contain %q", goStr, "feature.Key[int]")
 		}
 	})
 
-	t.Run("bool key shows name and value when unset", func(t *testing.T) {
+	t.Run("BoolKey GoString includes bool type", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
-		flag := feature.NewNamedBool("enable-feature")
-		debugValue := flag.DebugValue(ctx)
-		want := "enable-feature: <not set>"
+		flag := feature.NewNamedBool("my-feature")
+		goStr := flag.GoString()
 
-		if debugValue != want {
-			t.Errorf("DebugValue() unset = %q, want %q", debugValue, want)
-		}
-	})
-
-	t.Run("bool key shows name and value when enabled", func(t *testing.T) {
-		t.Parallel()
-
-		ctx := context.Background()
-		flag := feature.NewNamedBool("enable-feature")
-		ctx = flag.WithEnabled(ctx)
-		debugValue := flag.DebugValue(ctx)
-		want := "enable-feature: true"
-
-		if debugValue != want {
-			t.Errorf("DebugValue() enabled = %q, want %q", debugValue, want)
-		}
-	})
-
-	t.Run("bool key shows name and value when disabled", func(t *testing.T) {
-		t.Parallel()
-
-		ctx := context.Background()
-		flag := feature.NewNamedBool("enable-feature")
-		ctx = flag.WithDisabled(ctx)
-		debugValue := flag.DebugValue(ctx)
-		want := "enable-feature: false"
-
-		if debugValue != want {
-			t.Errorf("DebugValue() disabled = %q, want %q", debugValue, want)
-		}
-	})
-
-	t.Run("anonymous key shows call site info in name", func(t *testing.T) {
-		t.Parallel()
-
-		ctx := context.Background()
-		key := feature.New[string]()
-		ctx = key.WithValue(ctx, "value")
-
-		debugValue := key.DebugValue(ctx)
-		// Should contain "anonymous(" (call site info) and "@0x" (address) and ": value"
-		if !strings.Contains(debugValue, "anonymous(") {
-			t.Errorf("DebugValue() = %q, want to contain %q", debugValue, "anonymous(")
+		if !strings.Contains(goStr, "feature.Key[bool]") {
+			t.Errorf("GoString() = %q, want to contain %q", goStr, "feature.Key[bool]")
 		}
 
-		if !strings.Contains(debugValue, "@0x") {
-			t.Errorf("DebugValue() = %q, want to contain %q", debugValue, "@0x")
-		}
-
-		if !strings.Contains(debugValue, ": value") {
-			t.Errorf("DebugValue() = %q, want to contain %q", debugValue, ": value")
-		}
-	})
-
-	t.Run("complex value types are formatted", func(t *testing.T) {
-		t.Parallel()
-
-		type Config struct {
-			MaxRetries int
-			Timeout    string
-		}
-
-		ctx := context.Background()
-		key := feature.NewNamed[Config]("config")
-		ctx = key.WithValue(ctx, Config{MaxRetries: 3, Timeout: "30s"})
-
-		debugValue := key.DebugValue(ctx)
-		// Should contain the key name and struct representation
-		if !strings.Contains(debugValue, "config:") {
-			t.Errorf("DebugValue() = %q, want to contain %q", debugValue, "config:")
-		}
-		// Check that it contains the struct values
-		if !strings.Contains(debugValue, "3") || !strings.Contains(debugValue, "30s") {
-			t.Errorf("DebugValue() = %q, want to contain struct values", debugValue)
+		if !strings.Contains(goStr, "my-feature") {
+			t.Errorf("GoString() = %q, want to contain %q", goStr, "my-feature")
 		}
 	})
 }
@@ -978,22 +908,27 @@ func ExampleKey_IsNotSet() {
 	// Using cache size: 1024
 }
 
-func ExampleKey_DebugValue() {
+func ExampleKey_Inspect() {
 	ctx := context.Background()
 
 	// Create a named key for better debug output
 	var MaxRetries = feature.NewNamed[int]("max-retries")
 
-	// Check debug value when not set
-	fmt.Println(MaxRetries.DebugValue(ctx))
+	// Inspect when not set
+	fmt.Println(MaxRetries.Inspect(ctx))
 
-	// Set a value and check again
+	// Set a value and inspect again
 	ctx = MaxRetries.WithValue(ctx, 5)
-	fmt.Println(MaxRetries.DebugValue(ctx))
+	inspection := MaxRetries.Inspect(ctx)
+	fmt.Println(inspection)
+	fmt.Println("Value:", inspection.Get())
+	fmt.Println("Is set:", inspection.IsSet())
 
 	// Output:
 	// max-retries: <not set>
 	// max-retries: 5
+	// Value: 5
+	// Is set: true
 }
 
 func ExampleKey_String() {

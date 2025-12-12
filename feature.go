@@ -42,6 +42,15 @@
 //	ctx = MaxItemsKey.WithValue(ctx, 100)
 //	limit := MaxItemsKey.Get(ctx) // Returns 100
 //
+// # Inspecting Values
+//
+// Use Inspect to retrieve both the value and whether it was set in one call:
+//
+//	var MaxItems = feature.NewNamed[int]("max-items")
+//	inspection := MaxItems.Inspect(ctx)
+//	fmt.Println(inspection)         // Output: "max-items: 100" or "max-items: <not set>"
+//	fmt.Println(inspection.IsSet()) // Output: true or false
+//
 // # Key Properties
 //
 //   - Type-safe: Uses generics to ensure type safety at compile time
@@ -93,12 +102,13 @@ type Key[V any] interface {
 	// It is equivalent to !IsSet(ctx).
 	IsNotSet(ctx context.Context) bool
 
-	// DebugValue returns a string representation combining the key name and its value from the context.
-	// This is useful for debugging and logging purposes.
-	// Format: "<key-name>: <value>" or "<key-name>: <not set>".
-	DebugValue(ctx context.Context) string
+	// Inspect retrieves the value from the context and returns an Inspection
+	// that provides convenient methods for working with the result.
+	Inspect(ctx context.Context) Inspection[V]
 
 	fmt.Stringer
+
+	fmt.GoStringer
 
 	// downcast is an internal method used to retrieve the underlying key implementation.
 	// also used for sealing the interface.
@@ -131,6 +141,10 @@ type BoolKey interface {
 	// WithDisabled returns a new context with this feature flag disabled (set to false).
 	// The original context is not modified.
 	WithDisabled(ctx context.Context) context.Context
+
+	// InspectBool retrieves the value from the context and returns a BoolInspection
+	// that provides convenience methods for working with boolean feature flags.
+	InspectBool(ctx context.Context) BoolInspection
 }
 
 // Option is a function that configures the behavior of a feature flag key.
@@ -145,7 +159,7 @@ type options struct {
 }
 
 // WithName returns an option that sets a debug name for the key.
-// This name is included in the String() output and used in DebugValue() for easier debugging.
+// This name is included in the String() output for easier debugging.
 //
 // Example:
 //
@@ -284,22 +298,26 @@ type boolKey struct {
 }
 
 // String returns the debug name of the key.
+// This implements fmt.Stringer.
 func (k key[V]) String() string {
 	return k.name
 }
 
-// DebugValue returns a string representation combining the key name and its value from the context.
-// This is useful for debugging and logging purposes.
-// Format: "<key-name>: <value>" or "<key-name>: <not set>".
-func (k key[V]) DebugValue(ctx context.Context) string {
-	keyName := k.String()
+// GoString returns a Go syntax representation of the key.
+// This implements fmt.GoStringer.
+func (k key[V]) GoString() string {
+	return fmt.Sprintf("feature.Key[%T]{name: %q}", *new(V), k.name)
+}
+
+// Inspect retrieves the value from the context and returns an Inspection.
+func (k key[V]) Inspect(ctx context.Context) Inspection[V] {
 	val, ok := k.TryGet(ctx)
 
-	if !ok {
-		return keyName + ": <not set>"
+	return Inspection[V]{
+		Key:   k,
+		Value: val,
+		Ok:    ok,
 	}
-
-	return fmt.Sprintf("%s: %v", keyName, val)
 }
 
 func (k key[V]) downcast() key[V] {
@@ -314,9 +332,7 @@ func (k key[V]) WithValue(ctx context.Context, value V) context.Context {
 // Get retrieves the value associated with this key from the context.
 // If the key is not set in the context, it returns the zero value of type V.
 func (k key[V]) Get(ctx context.Context) V {
-	val, _ := k.TryGet(ctx)
-
-	return val
+	return k.Inspect(ctx).Get()
 }
 
 // TryGet attempts to retrieve the value associated with this key from the context.
@@ -330,51 +346,43 @@ func (k key[V]) TryGet(ctx context.Context) (V, bool) {
 // GetOrDefault retrieves the value associated with this key from the context.
 // If the key is not set, it returns the provided default value.
 func (k key[V]) GetOrDefault(ctx context.Context, defaultValue V) V {
-	if val, ok := k.TryGet(ctx); ok {
-		return val
-	}
-
-	return defaultValue
+	return k.Inspect(ctx).GetOrDefault(defaultValue)
 }
 
 // MustGet retrieves the value associated with this key from the context.
 // If the key is not set, it panics with a descriptive error message.
 func (k key[V]) MustGet(ctx context.Context) V {
-	val, ok := k.TryGet(ctx)
-	if !ok {
-		panic(fmt.Sprintf("key %s is not set in context", k.String()))
-	}
-
-	return val
+	return k.Inspect(ctx).MustGet()
 }
 
 // IsSet returns true if this key has been set in the context.
 func (k key[V]) IsSet(ctx context.Context) bool {
-	_, ok := k.TryGet(ctx)
-
-	return ok
+	return k.Inspect(ctx).IsSet()
 }
 
 // IsNotSet returns true if this key has not been set in the context.
 func (k key[V]) IsNotSet(ctx context.Context) bool {
-	return !k.IsSet(ctx)
+	return k.Inspect(ctx).IsNotSet()
+}
+
+// InspectBool retrieves the value from the context and returns a BoolInspection.
+func (k boolKey) InspectBool(ctx context.Context) BoolInspection {
+	return BoolInspection{Inspection: k.Inspect(ctx)}
 }
 
 // Enabled returns true if the feature flag is set to true in the context.
 func (k boolKey) Enabled(ctx context.Context) bool {
-	return k.Get(ctx)
+	return k.InspectBool(ctx).Enabled()
 }
 
 // Disabled returns true if the feature flag is either not set or set to false.
 func (k boolKey) Disabled(ctx context.Context) bool {
-	return !k.Enabled(ctx)
+	return k.InspectBool(ctx).Disabled()
 }
 
 // ExplicitlyDisabled returns true if the feature flag is explicitly set to false.
 func (k boolKey) ExplicitlyDisabled(ctx context.Context) bool {
-	val, ok := k.TryGet(ctx)
-
-	return ok && !val
+	return k.InspectBool(ctx).ExplicitlyDisabled()
 }
 
 // WithEnabled returns a new context with this feature flag enabled (set to true).
