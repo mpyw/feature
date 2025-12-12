@@ -14,6 +14,8 @@ linters:
     - interfacebloat
     # Disable depguard since this is a simple package without external dependencies
     - depguard
+    # Allow if err := ...; err != nil {} blocks
+    - noinlineerr
   settings:
     cyclop:
       max-complexity: 30
