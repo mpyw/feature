@@ -261,8 +261,13 @@ var (
 ```go
 // Named keys make debugging easier
 var MyFeature = feature.NewNamedBool("my-feature")
-fmt.Println(MyFeature.String())
+fmt.Println(MyFeature)
 // Output: my-feature
+
+// Anonymous keys automatically include call site information for debugging
+var AnonFeature = feature.NewBool()
+fmt.Println(AnonFeature)
+// Output: anonymous(/path/to/file.go:42)@0x14000010098
 ```
 
 ### 3. Use Type-Safe Value Keys

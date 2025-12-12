@@ -458,39 +458,19 @@ func TestBoolKey(t *testing.T) {
 func TestString(t *testing.T) {
 	t.Parallel()
 
-	t.Run("named key returns the name", func(t *testing.T) {
+	// Named key tests
+
+	t.Run("New with WithName returns the name", func(t *testing.T) {
 		t.Parallel()
 
-		key := feature.NewNamed[string]("test-key")
+		key := feature.New[string](feature.WithName("test-key"))
 
 		if got := key.String(); got != "test-key" {
 			t.Errorf("String() = %q, want %q", got, "test-key")
 		}
 	})
 
-	t.Run("anonymous key returns address-based name", func(t *testing.T) {
-		t.Parallel()
-
-		key := feature.New[int]()
-		str := key.String()
-
-		// Should start with "anonymous@0x"
-		if !strings.HasPrefix(str, "anonymous@0x") {
-			t.Errorf("String() = %q, want prefix %q", str, "anonymous@0x")
-		}
-	})
-
-	t.Run("NewNamedBool creates named bool key", func(t *testing.T) {
-		t.Parallel()
-
-		flag := feature.NewNamedBool("my-feature")
-
-		if got := flag.String(); got != "my-feature" {
-			t.Errorf("String() = %q, want %q", got, "my-feature")
-		}
-	})
-
-	t.Run("NewNamed creates named value key", func(t *testing.T) {
+	t.Run("NewNamed returns the name", func(t *testing.T) {
 		t.Parallel()
 
 		key := feature.NewNamed[int]("max-retries")
@@ -500,61 +480,13 @@ func TestString(t *testing.T) {
 		}
 	})
 
-	t.Run("custom stringer can be provided", func(t *testing.T) {
+	t.Run("NewNamedBool returns the name", func(t *testing.T) {
 		t.Parallel()
 
-		customFormat := func(name string) string {
-			return fmt.Sprintf("[%s]", name)
-		}
+		flag := feature.NewNamedBool("my-feature")
 
-		key := feature.New[int](
-			feature.WithName("test"),
-			feature.WithStringer(customFormat),
-		)
-
-		want := "[test]"
-		if got := key.String(); got != want {
-			t.Errorf("String() = %q, want %q", got, want)
-		}
-	})
-
-	t.Run("custom stringer works with anonymous keys", func(t *testing.T) {
-		t.Parallel()
-
-		customFormat := func(name string) string {
-			return "custom:" + name
-		}
-		key := feature.New[int](feature.WithStringer(customFormat))
-		str := key.String()
-
-		// Should have custom prefix and contain anonymous@0x
-		if !strings.HasPrefix(str, "custom:anonymous@0x") {
-			t.Errorf("String() = %q, want prefix %q", str, "custom:anonymous@0x")
-		}
-	})
-
-	t.Run("nil stringer falls back to default behavior", func(t *testing.T) {
-		t.Parallel()
-
-		key := feature.New[int](
-			feature.WithName("nil-stringer-key"),
-			feature.WithStringer(nil),
-		)
-
-		if got := key.String(); got != "nil-stringer-key" {
-			t.Errorf("String() = %q, want %q", got, "nil-stringer-key")
-		}
-	})
-
-	t.Run("nil stringer with anonymous key", func(t *testing.T) {
-		t.Parallel()
-
-		key := feature.New[int](feature.WithStringer(nil))
-		str := key.String()
-
-		// Should still produce anonymous@0x format
-		if !strings.HasPrefix(str, "anonymous@0x") {
-			t.Errorf("String() = %q, want prefix %q", str, "anonymous@0x")
+		if got := flag.String(); got != "my-feature" {
+			t.Errorf("String() = %q, want %q", got, "my-feature")
 		}
 	})
 }
@@ -633,7 +565,7 @@ func TestDebugValue(t *testing.T) {
 		}
 	})
 
-	t.Run("anonymous key shows address in name", func(t *testing.T) {
+	t.Run("anonymous key shows call site info in name", func(t *testing.T) {
 		t.Parallel()
 
 		ctx := context.Background()
@@ -641,9 +573,13 @@ func TestDebugValue(t *testing.T) {
 		ctx = key.WithValue(ctx, "value")
 
 		debugValue := key.DebugValue(ctx)
-		// Should contain "anonymous@0x" and ": value"
-		if !strings.Contains(debugValue, "anonymous@0x") {
-			t.Errorf("DebugValue() = %q, want to contain %q", debugValue, "anonymous@0x")
+		// Should contain "anonymous(" (call site info) and "@0x" (address) and ": value"
+		if !strings.Contains(debugValue, "anonymous(") {
+			t.Errorf("DebugValue() = %q, want to contain %q", debugValue, "anonymous(")
+		}
+
+		if !strings.Contains(debugValue, "@0x") {
+			t.Errorf("DebugValue() = %q, want to contain %q", debugValue, "@0x")
 		}
 
 		if !strings.Contains(debugValue, ": value") {
@@ -686,20 +622,6 @@ func TestNewNamed(t *testing.T) {
 
 		if got := key.String(); got != "test-key" {
 			t.Errorf("String() = %q, want %q", got, "test-key")
-		}
-	})
-
-	t.Run("accepts additional options", func(t *testing.T) {
-		t.Parallel()
-
-		customStringer := feature.WithStringer(func(name string) string {
-			return "custom:" + name
-		})
-		key := feature.NewNamed[int]("named-key", customStringer)
-		want := "custom:named-key"
-
-		if got := key.String(); got != want {
-			t.Errorf("String() = %q, want %q", got, want)
 		}
 	})
 
@@ -859,7 +781,7 @@ func ExampleNewNamedBool() {
 	// Create a named boolean feature flag for easier debugging
 	var EnableBetaFeature = feature.NewNamedBool("beta-feature")
 
-	fmt.Println(EnableBetaFeature.String())
+	fmt.Println(EnableBetaFeature)
 
 	// Output:
 	// beta-feature
@@ -892,7 +814,7 @@ func ExampleNewNamed() {
 	ctx = MaxRetries.WithValue(ctx, 3)
 
 	// Retrieve the value and name
-	fmt.Printf("%s: %d\n", MaxRetries.String(), MaxRetries.Get(ctx))
+	fmt.Printf("%s: %d\n", MaxRetries, MaxRetries.Get(ctx))
 
 	// Output:
 	// max-retries: 3
@@ -906,27 +828,10 @@ func ExampleWithName() {
 		feature.WithName("api-key"),
 	)
 
-	fmt.Println(APIKey.String())
+	fmt.Println(APIKey)
 
 	// Output:
 	// api-key
-}
-
-func ExampleWithStringer() {
-	// Use custom formatter for key names
-	customFormatter := func(name string) string {
-		return fmt.Sprintf("[FEATURE:%s]", name)
-	}
-
-	var FeatureFlag = feature.New[bool](
-		feature.WithName("experimental"),
-		feature.WithStringer(customFormatter),
-	)
-
-	fmt.Println(FeatureFlag.String())
-
-	// Output:
-	// [FEATURE:experimental]
 }
 
 // Key[V] Method Examples
@@ -1094,29 +999,19 @@ func ExampleKey_DebugValue() {
 func ExampleKey_String() {
 	// WithName keys show their name
 	namedKey := feature.NewNamed[string]("api-key")
-	fmt.Println(namedKey.String())
+	fmt.Println(namedKey)
 
-	// Anonymous keys show their address
+	// Anonymous keys show their call site info and address
 	anonymousKey := feature.New[int]()
 	str := anonymousKey.String()
-	// Check that it starts with "anonymous@"
-	if len(str) > 10 && str[:10] == "anonymous@" {
-		fmt.Println("Anonymous key format: anonymous@<address>")
+	// Check that it starts with "anonymous(" (call site info is included)
+	if strings.HasPrefix(str, "anonymous(") && strings.Contains(str, "@0x") {
+		fmt.Println("Anonymous key format: anonymous(file:line)@<address>")
 	}
-
-	// Custom formatter
-	customKey := feature.New[int](
-		feature.WithName("max-retries"),
-		feature.WithStringer(func(name string) string {
-			return fmt.Sprintf("[%s]", name)
-		}),
-	)
-	fmt.Println(customKey.String())
 
 	// Output:
 	// api-key
-	// Anonymous key format: anonymous@<address>
-	// [max-retries]
+	// Anonymous key format: anonymous(file:line)@<address>
 }
 
 // BoolKey Method Examples

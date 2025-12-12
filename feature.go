@@ -22,12 +22,17 @@
 //
 //	ctx = MyFeature.WithEnabled(ctx)
 //
-// # WithName Keys for Debugging
+// # Named Keys for Debugging
 //
 // You can create named keys to help with debugging:
 //
 //	var MyFeature = feature.NewNamedBool("my-feature")
 //	fmt.Println(MyFeature) // Output: my-feature
+//
+// Anonymous keys (without a name) automatically include call site information:
+//
+//	var AnonFeature = feature.NewBool()
+//	fmt.Println(AnonFeature) // Output: anonymous(/path/to/file.go:42)@0x14000010098
 //
 // # Value-Based Feature Flags
 //
@@ -48,6 +53,7 @@ package feature
 import (
 	"context"
 	"fmt"
+	"runtime"
 )
 
 // Key is a type-safe accessor for feature flags stored in context.Context.
@@ -127,19 +133,15 @@ type BoolKey interface {
 	WithDisabled(ctx context.Context) context.Context
 }
 
-// StringerFunc is a function that formats a key name as a string.
-// It receives a resolved key name (never empty - anonymous keys are already
-// formatted as "anonymous@<address>") and returns the final string representation.
-// The default implementation returns the name as-is.
-type StringerFunc func(name string) string
-
 // Option is a function that configures the behavior of a feature flag key.
 type Option func(*options)
 
 // options configures the behavior of a feature flag key.
 type options struct {
-	name     string
-	stringer StringerFunc
+	name string
+
+	// internal use only - tracks the caller depth for name fallback
+	depth int
 }
 
 // WithName returns an option that sets a debug name for the key.
@@ -155,35 +157,19 @@ func WithName(name string) Option {
 	}
 }
 
-// WithStringer returns an option that sets a custom string formatter for the key name.
-// The formatter function receives a resolved key name (never empty) and returns
-// the final string representation.
-//
-// If not provided, the default formatter returns the name as-is.
-//
-// Example:
-//
-//	customFormatter := func(name string) string {
-//	    return fmt.Sprintf("[%s]", name)
-//	}
-//	var MyKey = feature.New[int](feature.WithStringer(customFormatter))
-func WithStringer(f StringerFunc) Option {
-	return func(o *options) {
-		o.stringer = f
-	}
-}
-
-// defaultStringer is the default string formatter for keys.
-// It returns the name as-is (identity function).
-func defaultStringer(name string) string {
-	return name
+// appendCallerDepthIncr appends an option that increments the caller depth for name fallback.
+// This is used internally to ensure correct caller depth when deriving names from call sites.
+func appendCallerDepthIncr(opts []Option) []Option {
+	return append(opts, func(o *options) {
+		o.depth++
+	})
 }
 
 // defaultOptions returns a new options with default values.
 func defaultOptions() *options {
 	return &options{
-		name:     "",
-		stringer: defaultStringer,
+		name:  "",
+		depth: 0,
 	}
 }
 
@@ -195,6 +181,24 @@ func optionsFrom(opts []Option) *options {
 	}
 
 	return o
+}
+
+func computeKeyName(ident *opaque, name string, depth int) string {
+	// Resolve the base name (handle anonymous keys)
+	if name == "" {
+		// Default fallback
+		name = fmt.Sprintf("anonymous@%p", ident)
+		// Enhance with call site info if available.
+		// depth is the number of stack frames added by wrapper functions.
+		// Each exported function (New, NewBool, NewNamed, NewNamedBool) calls appendCallerDepthIncr.
+		// The call stack is: runtime.Caller -> computeKeyName -> New -> [wrappers...] -> user code
+		// Base offset is 1 (computeKeyName itself), plus depth for wrapper functions.
+		if _, file, line, ok := runtime.Caller(1 + depth); ok {
+			name = fmt.Sprintf("anonymous(%s:%d)@%p", file, line, ident)
+		}
+	}
+
+	return name
 }
 
 // NewBool creates a new boolean feature flag key.
@@ -212,6 +216,8 @@ func optionsFrom(opts []Option) *options {
 //	    }
 //	}
 func NewBool(options ...Option) BoolKey {
+	options = appendCallerDepthIncr(options)
+
 	return boolKey{key: New[bool](options...).downcast()}
 }
 
@@ -225,6 +231,8 @@ func NewBool(options ...Option) BoolKey {
 //	var EnableNewUI = feature.NewNamedBool("new-ui")
 //	fmt.Println(EnableNewUI) // Output: new-ui
 func NewNamedBool(name string, options ...Option) BoolKey {
+	options = appendCallerDepthIncr(options)
+
 	return NewBool(append([]Option{WithName(name)}, options...)...)
 }
 
@@ -239,12 +247,13 @@ func NewNamedBool(name string, options ...Option) BoolKey {
 //	ctx = MaxRetries.WithValue(ctx, 5)
 //	retries := MaxRetries.Get(ctx) // Returns 5
 func New[V any](options ...Option) Key[V] {
+	options = appendCallerDepthIncr(options)
 	opts := optionsFrom(options)
+	ident := new(opaque)
 
 	return key[V]{
-		name:     opts.name,
-		stringer: opts.stringer,
-		ident:    new(opaque),
+		name:  computeKeyName(ident, opts.name, opts.depth),
+		ident: ident,
 	}
 }
 
@@ -258,14 +267,15 @@ func New[V any](options ...Option) Key[V] {
 //	var MaxRetries = feature.NewNamed[int]("max-retries")
 //	fmt.Println(MaxRetries) // Output: max-retries
 func NewNamed[V any](name string, options ...Option) Key[V] {
+	options = appendCallerDepthIncr(options)
+
 	return New[V](append([]Option{WithName(name)}, options...)...)
 }
 
 // key is the internal implementation of Key[V].
 type key[V any] struct {
-	name     string
-	stringer StringerFunc
-	ident    *opaque
+	name  string
+	ident *opaque
 }
 
 // boolKey is the internal implementation of BoolKey.
@@ -273,23 +283,9 @@ type boolKey struct {
 	key[bool]
 }
 
-// String returns a string representation of the key name.
-// The format can be customized via the WithStringer option.
-// By default, it returns the debug name if provided, or "anonymous@<address>" otherwise.
+// String returns the debug name of the key.
 func (k key[V]) String() string {
-	// Resolve the base name (handle anonymous keys)
-	name := k.name
-	if name == "" {
-		name = fmt.Sprintf("anonymous@%p", k.ident)
-	}
-
-	// Apply custom stringer if provided
-	stringer := k.stringer
-	if stringer == nil {
-		stringer = defaultStringer
-	}
-
-	return stringer(name)
+	return k.name
 }
 
 // DebugValue returns a string representation combining the key name and its value from the context.
