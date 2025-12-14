@@ -491,56 +491,6 @@ func TestString(t *testing.T) {
 	})
 }
 
-// TestGoString tests the GoString method for keys.
-func TestGoString(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Key GoString includes package name and type", func(t *testing.T) {
-		t.Parallel()
-
-		key := feature.NewNamed[string]("test-key")
-		goStr := key.GoString()
-
-		if !strings.Contains(goStr, "feature.Key[string]") {
-			t.Errorf("GoString() = %q, want to contain %q", goStr, "feature.Key[string]")
-		}
-
-		if !strings.Contains(goStr, "name:") {
-			t.Errorf("GoString() = %q, want to contain field name %q", goStr, "name:")
-		}
-
-		if !strings.Contains(goStr, "test-key") {
-			t.Errorf("GoString() = %q, want to contain %q", goStr, "test-key")
-		}
-	})
-
-	t.Run("Key GoString with int type", func(t *testing.T) {
-		t.Parallel()
-
-		key := feature.NewNamed[int]("max-retries")
-		goStr := key.GoString()
-
-		if !strings.Contains(goStr, "feature.Key[int]") {
-			t.Errorf("GoString() = %q, want to contain %q", goStr, "feature.Key[int]")
-		}
-	})
-
-	t.Run("BoolKey GoString includes bool type", func(t *testing.T) {
-		t.Parallel()
-
-		flag := feature.NewNamedBool("my-feature")
-		goStr := flag.GoString()
-
-		if !strings.Contains(goStr, "feature.Key[bool]") {
-			t.Errorf("GoString() = %q, want to contain %q", goStr, "feature.Key[bool]")
-		}
-
-		if !strings.Contains(goStr, "my-feature") {
-			t.Errorf("GoString() = %q, want to contain %q", goStr, "my-feature")
-		}
-	})
-}
-
 // TestNewNamed tests the NewNamed constructor.
 func TestNewNamed(t *testing.T) {
 	t.Parallel()

@@ -303,12 +303,6 @@ func (k key[V]) String() string {
 	return k.name
 }
 
-// GoString returns a Go syntax representation of the key.
-// This implements fmt.GoStringer.
-func (k key[V]) GoString() string {
-	return fmt.Sprintf("feature.Key[%T]{name: %q}", *new(V), k.name)
-}
-
 // Inspect retrieves the value from the context and returns an Inspection.
 func (k key[V]) Inspect(ctx context.Context) Inspection[V] {
 	val, ok := k.TryGet(ctx)
