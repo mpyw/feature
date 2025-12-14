@@ -240,6 +240,97 @@ required := RequiredKey.MustGet(ctx)  // Panics with clear message if not set
 6. **Boolean keys**: Special `BoolKey` type with Enabled/Disabled/ExplicitlyDisabled methods
 7. **Three-state logic**: Distinguish between unset, explicitly true, and explicitly false
 
+## Background: Go Official Proposal
+
+A similar idea was proposed to the Go team in 2021:
+
+- [proposal: context: add generic key and value type #49189](https://github.com/golang/go/issues/49189)
+
+The proposal by [@dsnet](https://github.com/dsnet) (Joe Tsai, a Go team member) suggests:
+
+```go
+type Key[Value any] struct { name *string }
+
+func NewKey[Value any](name string) Key[Value] {
+    return Key[Value]{&name}  // Uses argument address for uniqueness
+}
+
+func (k Key[V]) WithValue(ctx Context, val V) Context
+func (k Key[V]) Value(ctx Context) (V, bool)
+```
+
+This package implements essentially the same concept. However, the official proposal has been on hold for over 3 years, primarily because:
+
+1. **Standard library generics policy is undecided** - [Discussion #48287](https://github.com/golang/go/discussions/48287) is still ongoing about how to add generics to existing packages
+2. **Migration path unclear** - Whether to deprecate `context.WithValue`/`context.Value` or keep both APIs
+3. **Alternative proposals being considered** - Multiple approaches are being evaluated in parallel
+
+This package provides an immediate, production-ready solution while the Go team deliberates.
+
+## Design Decisions
+
+### Sealed Interface Pattern
+
+Unlike the proposal's struct-based approach, this package uses the **Sealed Interface** pattern:
+
+```go
+type Key[V any] interface {
+    WithValue(ctx context.Context, value V) context.Context
+    Get(ctx context.Context) V
+    TryGet(ctx context.Context) (V, bool)
+    // ... other methods
+    downcast() key[V]  // unexported method prevents external implementation
+}
+
+type key[V any] struct {  // unexported implementation
+    name  string
+    ident *opaque
+}
+```
+
+**Why this matters:**
+
+The struct-based approach has a subtle vulnerability. In Go, you can bypass constructor functions and directly initialize structs with zero values for unexported fields:
+
+```go
+// With struct-based design:
+type Key[V any] struct { name *string }
+
+// This compiles! Both keys have nil name pointer
+badKeyX := Key[int]{}
+badKeyY := Key[string]{}
+// These will COLLIDE because both use (*string)(nil) as identity
+```
+
+Note: `(*T)(nil)` doesn't panic like `nil` does - it silently uses the zero value as the key, making collisions hard to detect.
+
+With the Sealed Interface pattern:
+- The implementation struct `key[V]` is unexported, preventing direct initialization
+- The interface contains an unexported method `downcast()`, preventing external implementations
+- Users **must** use `feature.New()` or `feature.NewBool()` to create keys
+
+**Additional benefit:** `BoolKey` can be used anywhere `Key[bool]` is expected, providing better interoperability than struct embedding would allow.
+
+### Empty Struct Optimization Avoidance
+
+The internal `opaque` type that provides pointer identity includes a byte field:
+
+```go
+type opaque struct {
+    _ byte  // Prevents address optimization
+}
+```
+
+Without this, Go's compiler optimization would give all zero-size struct pointers the same address:
+
+```go
+type empty struct{}
+
+a := new(empty)
+b := new(empty)
+fmt.Printf("%p %p\n", a, b)  // Same address! Keys would collide.
+```
+
 ## Best Practices
 
 ### 1. Define Keys as Package-Level Variables
@@ -299,3 +390,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## Related Projects
 
 - [context](https://pkg.go.dev/context) - Go's official context package
+- [proposal: context: add generic key and value type #49189](https://github.com/golang/go/issues/49189) - Go official proposal

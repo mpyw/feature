@@ -66,16 +66,6 @@ func (i Inspection[V]) String() string {
 	return fmt.Sprintf("%s: %v", i.Key.String(), i.Value)
 }
 
-// GoString returns a Go syntax representation of the inspection.
-// This implements fmt.GoStringer.
-func (i Inspection[V]) GoString() string {
-	if !i.Ok {
-		return fmt.Sprintf("feature.Inspection[%T]{Key: %#v, Ok: false}", *new(V), i.Key)
-	}
-
-	return fmt.Sprintf("feature.Inspection[%T]{Key: %#v, Value: %#v, Ok: true}", *new(V), i.Key, i.Value)
-}
-
 // BoolInspection is a specialized Inspection for boolean feature flags.
 // It provides convenience methods for working with boolean values.
 type BoolInspection struct {
@@ -106,12 +96,3 @@ func (i BoolInspection) String() string {
 	return i.Inspection.String()
 }
 
-// GoString returns a Go syntax representation of the inspection.
-// This implements fmt.GoStringer.
-func (i BoolInspection) GoString() string {
-	if !i.Ok {
-		return fmt.Sprintf("feature.BoolInspection{Key: %#v, Ok: false}", i.Key)
-	}
-
-	return fmt.Sprintf("feature.BoolInspection{Key: %#v, Value: %v, Ok: true}", i.Key, i.Value)
-}
