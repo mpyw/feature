@@ -1,8 +1,9 @@
 # feature
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/mpyw/feature.svg)](https://pkg.go.dev/github.com/mpyw/feature)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mpyw/feature)](https://goreportcard.com/report/github.com/mpyw/feature)
+[![Test](https://github.com/mpyw/feature/actions/workflows/test.yaml/badge.svg)](https://github.com/mpyw/feature/actions/workflows/test.yaml)
 [![Codecov](https://codecov.io/gh/mpyw/feature/graph/badge.svg?token=21VJVOVMY0)](https://codecov.io/gh/mpyw/feature)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mpyw/feature)](https://goreportcard.com/report/github.com/mpyw/feature)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A type-safe, collision-free feature flag implementation for Go using context.
