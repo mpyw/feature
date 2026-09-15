@@ -74,7 +74,7 @@ jobs:
           go-version: '1.25'
 
       - name: Set up mise
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@v4
 
       - name: Run declscope
         run: declscope ./...
