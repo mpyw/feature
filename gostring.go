@@ -1,3 +1,5 @@
+//declscope:core
+
 package feature
 
 import (
