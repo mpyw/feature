@@ -57,6 +57,8 @@
 //   - Collision-free: Each key is unique based on its pointer identity
 //   - Context-safe: Follows Go's context immutability guarantees
 //   - Zero dependencies: No external dependencies required
+//
+//declscope:core
 package feature
 
 import (
