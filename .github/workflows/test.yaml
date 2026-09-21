@@ -13,6 +13,12 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    # id-token: write is what the coverage upload authenticates with, in
+    # place of a stored token. A job's permissions replace the workflow's
+    # rather than add to them, so contents: read is restated here.
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       matrix:
         go-version: ['1.21', '1.22', '1.23', '1.24', '1.25']
@@ -38,8 +44,7 @@ jobs:
           files: ./coverage.txt
           flags: unittests
           name: codecov-${{ matrix.go-version }}
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
         continue-on-error: true
 
   lint:
