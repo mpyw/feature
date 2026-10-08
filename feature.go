@@ -316,10 +316,6 @@ func (k key[V]) Inspect(ctx context.Context) Inspection[V] {
 	}
 }
 
-func (k key[V]) downcast() key[V] {
-	return k
-}
-
 // WithValue returns a new context with the given value associated with this key.
 func (k key[V]) WithValue(ctx context.Context, value V) context.Context {
 	return context.WithValue(ctx, k.ident, value)
@@ -359,6 +355,10 @@ func (k key[V]) IsSet(ctx context.Context) bool {
 // IsNotSet returns true if this key has not been set in the context.
 func (k key[V]) IsNotSet(ctx context.Context) bool {
 	return k.Inspect(ctx).IsNotSet()
+}
+
+func (k key[V]) downcast() key[V] {
+	return k
 }
 
 // InspectBool retrieves the value from the context and returns a BoolInspection.
