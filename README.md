@@ -259,13 +259,13 @@ func (k Key[V]) WithValue(ctx Context, val V) Context
 func (k Key[V]) Value(ctx Context) (V, bool)
 ```
 
-This package implements essentially the same concept. However, the official proposal has been on hold for over 3 years, primarily because:
+This package implements essentially the same concept. However, the official proposal has been on hold since November 2021. The only reason given was ["On hold for understanding generics better."](https://github.com/golang/go/issues/49189#issuecomment-959782587) The Go team has not said anything about it since then.
 
-1. **Standard library generics policy is undecided** - [Discussion #48287](https://github.com/golang/go/discussions/48287) is still ongoing about how to add generics to existing packages
+1. **Generics were new** - The hold came before Go 1.18. [Discussion #48287](https://github.com/golang/go/discussions/48287) about how to add generics to existing APIs was closed in April 2023, but it did not decide anything for `context`.
 2. **Migration path unclear** - Whether to deprecate `context.WithValue`/`context.Value` or keep both APIs
-3. **Alternative proposals being considered** - Multiple approaches are being evaluated in parallel
+3. **It can live outside the standard library** - On the similar [#57025](https://github.com/golang/go/issues/57025), [@ianlancetaylor](https://github.com/ianlancetaylor) [suggested](https://github.com/golang/go/issues/57025#issuecomment-1382220573) starting as an external package and adopting it later if it sees wide use. That proposal was then retracted. [@dsnet](https://github.com/dsnet) also [pointed to](https://github.com/golang/go/issues/49189#issuecomment-2066946903) [`tailscale.com/util/ctxkey`](https://pkg.go.dev/tailscale.com/util/ctxkey), without API compatibility guarantees.
 
-This package provides an immediate, production-ready solution while the Go team deliberates.
+This package provides an immediate, production-ready solution in the meantime.
 
 ## Design Decisions
 
